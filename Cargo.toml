@@ -1,0 +1,14 @@
+[package]
+name = "fvq"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+colcon = "0.2.1"
+multidimension = "0.3.0"
+#oklab = "1.0.0"
+num-traits = "0.2.16"
+image = "0.24.7"
+clap = { version = "4.4.6", features = ["derive"] }
