@@ -93,13 +93,12 @@ impl Pyramid {
         let mut low = self.low;
         let mut highs = self.highs.into_vec().into_iter().rev().collect::<Vec<Array<_, _>>>();
         while let Some(high) = highs.pop() {
-            let (height, width) = low.size();
-            let haar = from_low_high(low, high + Scalar(0.5));
-            let quarters: Array<_, _> = <(Small, Grid)>::all((((), ()), (height, width)))
-                .map(|(bb, yx)| haar.at(yx).at(bb))
+            low = from_low_high(low, high + Scalar(0.5)).nested()
+                .transpose::<(), Small, Grid, ()>()
                 .transpose::<bool, usize, bool, usize>()
-                .collect();
-            low = Array::new((2 * height, 2 * width), quarters.to_raw());
+                .to_usize::<(bool, usize), (bool, usize), ()>()
+                .to_usize::<(), (bool, usize), usize>()
+                .iso().collect();
         }
         low
     }
