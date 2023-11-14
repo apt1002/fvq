@@ -87,7 +87,7 @@ mod tests {
 
     #[test]
     fn load_save() {
-        let pixels = load_image("../standard/lenna.pgm").unwrap();
+        let pixels = load_image("standard/lenna.png").unwrap();
         save_image(&pixels, "/tmp/lenna.pgm").unwrap();
         let pixels2 = load_image("/tmp/lenna.pgm").unwrap();
         let diff = match (pixels, pixels2) {
