@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 colcon = "0.2.1"
-multidimension = "0.3.0"
+multidimension = "0.3.1"
 #oklab = "1.0.0"
 num-traits = "0.2.16"
 image = "0.24.7"

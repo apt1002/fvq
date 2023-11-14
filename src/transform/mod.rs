@@ -1,9 +1,6 @@
 use multidimension::{Index, View, Scalar, Array};
 use super::{Grid, Small, Tile, Tree};
 
-mod chunks;
-use chunks::{FromUsize, ToUsize};
-
 mod haar;
 pub use haar::{Haar, to_haar, from_haar};
 
@@ -19,11 +16,8 @@ pub use vhc::{VHC, to_low, to_high, from_low_high};
 pub fn group<'a, T: Clone>(
     v: impl 'a + View<I=Grid, T=T>,
 ) -> impl 'a + View<I=(Grid, Small), T=T> {
-    let (height, width) = v.size();
-    let half_height = height / 2; assert_eq!(2 * half_height, height);
-    let half_width = width / 2; assert_eq!(2 * half_width, width);
-    let v = v.map_axis::<(), ToUsize<bool>, usize>(ToUsize(half_height, ()));
-    let v = v.map_axis::<(usize, bool), ToUsize<bool>, ()>(ToUsize(half_width, ()));
+    let v = v.from_usize::<(), (usize, bool), usize>(|height| (height / 2, ()));
+    let v = v.from_usize::<(usize, bool), (usize, bool), ()>(|width| (width / 2, ()));
     let v = v.transpose::<usize, usize, bool, bool>();
     v.iso()
 }
@@ -32,10 +26,9 @@ pub fn group<'a, T: Clone>(
 pub fn ungroup<'a, T: Clone>(
     v: impl 'a + View<I=(Grid, Small), T=T>
 ) -> impl 'a + View<I=Grid, T=T> {
-    let ((half_height, half_width), _) = v.size();
     let v = v.transpose::<usize, bool, usize, bool>();
-    let v = v.map_axis::<(usize, bool), FromUsize<bool>, ()>(FromUsize(half_width, ()));
-    let v = v.map_axis::<(), FromUsize<bool>, usize>(FromUsize(half_height, ()));
+    let v = v.to_usize::<(usize, bool), (usize, bool), ()>();
+    let v = v.to_usize::<(), (usize, bool), usize>();
     v.iso()
 }
 
