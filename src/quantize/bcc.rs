@@ -259,6 +259,21 @@ impl Chain {
 mod tests {
     use super::*;
 
+    /// Generate a list of 250 `ShiftedBCC` values.
+    fn some_bccs() -> Box<[ShiftedBCC]> {
+        const RANGE: [f32; 5] = [-4.0, -2.0, 0.0, 2.0, 4.0];
+        let mut ret = Vec::new();
+        for &v in &RANGE {
+            for &h in &RANGE {
+                for &c in &RANGE {
+                    ret.push(ShiftedBCC::new(v + 1.0, h, c + 0.5));
+                    ret.push(ShiftedBCC::new(v, h - 1.0, c - 0.5));
+                }
+            }
+        }
+        ret.into()
+    }
+
     #[test]
     fn round_trip() {
         for (v, h, c) in [
@@ -274,7 +289,7 @@ mod tests {
 
     #[test]
     fn arrow() {
-        let check = |a: ShiftedBCC| {
+        for a in some_bccs().into_iter() {
             let (observed_b, observed_r) = a.arrow();
             // Check the destination.
             let (expected_b, error_norm) = ShiftedBCC::quantize(0.5 * a.v(), 0.5 * a.h(), 0.5 * a.c());
@@ -291,14 +306,6 @@ mod tests {
             assert_eq!(observed_r.vhc(), expected_r,
                 "{:?}.arrow() gives residual {:?} (should be {:?})", a, observed_r.vhc(), expected_r,
             );
-        };
-        for v in [-2.0, 0.0, 2.0] {
-            for h in [-2.0, 0.0, 2.0] {
-                for c in [-2.0, 0.0, 2.0] {
-                    check(ShiftedBCC::new(v + 1.0, h, c + 0.5));
-                    check(ShiftedBCC::new(v, h - 1.0, c - 0.5));
-                }
-            }
         }
     }
 
