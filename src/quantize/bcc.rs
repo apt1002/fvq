@@ -105,6 +105,18 @@ impl ShiftedBCC {
 
 // ----------------------------------------------------------------------------
 
+/// A self-inverse symmetry operation. A subset of:
+/// - Exchange `v` with `h` and negate `c`.
+/// - Exchange `v` with `-h` and negate `c`.
+// Private: represented by bits `0` and `1` respectively.
+#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct Symmetry(u8);
+
+/// All possible [`Residual`]s.
+pub const ALL_SYMMETRIES: [Symmetry; 4] = [
+    Symmetry(0), Symmetry(1), Symmetry(2), Symmetry(3),
+];
+
 const RESIDUALS: [(f32, f32, f32); 8] = [
     (-0.5,  0.0,  0.75),
     ( 0.0, -0.5, -0.75),
@@ -142,18 +154,23 @@ impl Residual {
         let (v, h, c) = self.vhc();
         (-2.0 * v, -2.0 * h, -2.0 * c)
     }
+
+    /// Returns the unique [`Symmetry`] that maps `self` onto either
+    /// `ALL_RESIDUALS[0]` or `ALL_RESIDUALS[4]`.
+    pub fn recommend_symmetry(self) -> Symmetry {
+        Symmetry(self.0 & 3)
+    }
+
+    /// Applies `symmetry` to `self`. This is its own inverse.
+    pub fn apply_symmetry(self, s: Symmetry) -> Self {
+        Self(self.0 ^ s.0)
+    }
 }
 
 /// All possible [`Residual`]s.
 pub const ALL_RESIDUALS: [Residual; 8] = [
-    Residual(0),
-    Residual(1),
-    Residual(2),
-    Residual(3),
-    Residual(4),
-    Residual(5),
-    Residual(6),
-    Residual(7),
+    Residual(0), Residual(1), Residual(2), Residual(3),
+    Residual(4), Residual(5), Residual(6), Residual(7),
 ];
 
 /// Used to implement [`ShiftedBCC::arrow()`].
@@ -189,7 +206,7 @@ impl Chain {
         let mut residuals = Vec::new();
         loop {
             let (half, last_residual) = bcc.arrow();
-            if bcc == half { return Chain {residuals, last_residual}; }
+            if bcc == half { return Self {residuals, last_residual}; }
             residuals.push(last_residual);
             bcc = half;
         }
@@ -216,6 +233,14 @@ impl Chain {
     pub fn to_bcc(&self) -> ShiftedBCC {
         let (v, h, c) = self.vhc();
         ShiftedBCC::new(v, h, c)
+    }
+
+    /// Applies `symmetry` to `self`. This is its own inverse.
+    pub fn apply_symmetry(&self, s: Symmetry) -> Self {
+        Self {
+            residuals: self.residuals.iter().map(|&r| r.apply_symmetry(s)).collect(),
+            last_residual: self.last_residual.apply_symmetry(s),
+        }
     }
 }
 
@@ -282,6 +307,42 @@ mod tests {
     }
 
     #[test]
+    fn symmetries() {
+        // Test `Symmetry(1)`.
+        for &bcc in &ALL_RESIDUALS {
+            let (v, h, c) = bcc.vhc();
+            let sbcc = bcc.apply_symmetry(Symmetry(1));
+            let (sv, sh, sc) = sbcc.vhc();
+            assert_eq!(v, sh);
+            assert_eq!(h, sv);
+            assert_eq!(c, -sc);
+        }
+        // Test `Symmetry(2)`.
+        for &bcc in &ALL_RESIDUALS {
+            let (v, h, c) = bcc.vhc();
+            let sbcc = bcc.apply_symmetry(Symmetry(2));
+            let (sv, sh, sc) = sbcc.vhc();
+            assert_eq!(v, -sh);
+            assert_eq!(h, -sv);
+            assert_eq!(c, -sc);
+        }
+        // Test recommended_symmetry().
+        for &bcc in &ALL_RESIDUALS {
+            let s = bcc.recommend_symmetry();
+            let sbcc = bcc.apply_symmetry(s);
+            assert_eq!(sbcc.0 & 3, 0);
+        }
+        // Test self-inverse property.
+        for &s in &ALL_SYMMETRIES {
+            for &bcc in &ALL_RESIDUALS {
+                let sbcc = bcc.apply_symmetry(s);
+                let ssbcc = sbcc.apply_symmetry(s);
+                assert_eq!(bcc, ssbcc);
+            }
+        }
+    }
+
+    #[test]
     fn short_chain() {
         for &(v, h, c) in &FIXED_POINTS {
             let bcc = ShiftedBCC::new(v, h, c);
@@ -300,6 +361,18 @@ mod tests {
             let chain = Chain::from_bcc(bcc);
             let new_bcc = chain.to_bcc();
             assert_eq!(bcc, new_bcc);
+        }
+    }
+
+    #[test]
+    fn chain_symmetries() {
+        for &bcc in some_bccs().iter() {
+            let chain = Chain::from_bcc(bcc);
+            for &s in &ALL_SYMMETRIES {
+                let schain = chain.apply_symmetry(s);
+                let sschain = schain.apply_symmetry(s);
+                assert_eq!(chain, sschain);
+            }
         }
     }
 }

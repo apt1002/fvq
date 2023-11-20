@@ -4,7 +4,7 @@ use super::{Tile, Tree, VHC};
 use super::transform::{Haar};
 
 mod bcc;
-pub use bcc::{ShiftedBCC, Residual, ALL_RESIDUALS, Chain};
+pub use bcc::{ShiftedBCC, Symmetry, ALL_SYMMETRIES, Residual, ALL_RESIDUALS, Chain};
 
 // ----------------------------------------------------------------------------
 

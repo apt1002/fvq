@@ -79,6 +79,7 @@ impl BCCStatistics {
     /// [`bcc_counts[bcc]`]: Self::bcc_counts
     pub fn count_bcc(&mut self, bcc: ShiftedBCC) {
         let chain = Chain::from_bcc(bcc);
+        let chain = chain.apply_symmetry(chain.last_residual.recommend_symmetry());
         if chain.residuals.len() == 0 {
             *self.short_counts.entry(chain.last_residual).or_insert(0) += 1;
         } else {
@@ -132,7 +133,7 @@ fn main() -> fvq::Result {
     eprintln!();
     println!("pixel_count = {:?}", pixel_count);
     println!("leaf_count = {:?}", statistics.leaf_count);
-    for &fixed_point in &ALL_RESIDUALS {
+    for fixed_point in [ALL_RESIDUALS[0], ALL_RESIDUALS[4]] {
         println!();
         println!("Fixed point {:?}", fixed_point);
         println!("short_count = {:?}", statistics.short_counts.get(&fixed_point).unwrap_or(&0));
