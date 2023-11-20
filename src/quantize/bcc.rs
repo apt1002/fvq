@@ -106,26 +106,26 @@ impl ShiftedBCC {
 // ----------------------------------------------------------------------------
 
 const RESIDUALS: [(f32, f32, f32); 8] = [
+    (-0.5,  0.0,  0.75),
     ( 0.0, -0.5, -0.75),
     ( 0.0,  0.5, -0.75),
+    ( 0.5,  0.0,  0.75),
     (-0.5,  0.0, -0.25),
-    ( 0.5,  0.0, -0.25),
     ( 0.0, -0.5,  0.25),
     ( 0.0,  0.5,  0.25),
-    (-0.5,  0.0,  0.75),
-    ( 0.5,  0.0,  0.75),
+    ( 0.5,  0.0, -0.25),
 ];
 
 /// A simple function of `RESIDUALS` used to implement [`ShiftedBCC::arrow()`].
 const DELTAS: [(i16, i16, i16); 8] = [
+    ( 0,  0,  2),
     ( 1, -1, -1),
     ( 1,  1, -1),
+    ( 2,  0,  2),
     ( 0,  0,  0),
-    ( 2,  0,  0),
     ( 1, -1,  1),
     ( 1,  1,  1),
-    ( 0,  0,  2),
-    ( 2,  0,  2),
+    ( 2,  0,  0),
 ];
 
 /// Represents `½A - B` where `A → B`. See [`ShiftedBCC::arrow()`].
@@ -158,11 +158,11 @@ pub const ALL_RESIDUALS: [Residual; 8] = [
 
 /// Used to implement [`ShiftedBCC::arrow()`].
 const SYNDROMES: [[[Residual; 4]; 2]; 2] = [[
-    [Residual(2), Residual(5), Residual(6), Residual(1)],
-    [Residual(7), Residual(4), Residual(3), Residual(0)],
+    [Residual(4), Residual(6), Residual(0), Residual(2)],
+    [Residual(3), Residual(5), Residual(7), Residual(1)],
 ], [
-    [Residual(3), Residual(0), Residual(7), Residual(4)],
-    [Residual(6), Residual(1), Residual(2), Residual(5)],
+    [Residual(7), Residual(1), Residual(3), Residual(5)],
+    [Residual(0), Residual(2), Residual(4), Residual(6)],
 ]];
 
 // ----------------------------------------------------------------------------

@@ -116,6 +116,7 @@ fn main() -> fvq::Result {
     let image_paths: Vec<String> = std::fs::read_to_string(&args.list_path)?.lines().map(String::from).collect();
     eprintln!("Collecting statistics from {} images", image_paths.len());
     let order = args.order(5);
+    let mut pixel_count = 0;
     let mut statistics = BCCStatistics::default();
     for image_path in &image_paths {
         let in_pixels = load_image(image_path)?;
@@ -123,12 +124,13 @@ fn main() -> fvq::Result {
             Pixels::L(pa) => pa.crop_to_multiple(1 << order).column(L).collect(),
             _ => Err(Error("Image must only have a luma channel"))?,
         };
-        let in_pixels = in_pixels;
+        pixel_count += in_pixels.len();
         let pyramid = Pyramid::from_pixels(order, true, in_pixels);
         statistics.count_pyramid(&pyramid);
         eprint!("."); std::io::Write::flush(&mut std::io::stderr())?;
     }
     eprintln!();
+    println!("pixel_count = {:?}", pixel_count);
     println!("leaf_count = {:?}", statistics.leaf_count);
     for &fixed_point in &ALL_RESIDUALS {
         println!();
