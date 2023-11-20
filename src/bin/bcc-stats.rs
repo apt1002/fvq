@@ -3,7 +3,7 @@ use clap::{Parser};
 use multidimension::{Size, View, Array};
 use fvq::{Error, Grid, Tree, Position, Pyramid};
 use fvq::io::{load_image, Pixels, L};
-use fvq::quantize::{to_digital, ShiftedBCC, Residual, ALL_RESIDUALS, Rotation, ALL_ROTATIONS, Chain};
+use fvq::quantize::{to_digital, ShiftedBCC, Residual, ALL_RESIDUALS, Chain};
 
 #[derive(Debug, Parser)]
 #[command(about = "Collect statistics about a corpus of images.")]
@@ -26,37 +26,29 @@ impl Args {
 
 // ----------------------------------------------------------------------------
 
-/// An abbreviation of a `ShiftedBCC`.
+/// An abbreviation of a `ShiftedBCC` that is not a fixed point of `arrow()`.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub struct BCCSummary {
-    /// The point at the end of `chain`, which defines its orientation.
-    pub rotation: Rotation,
-
     /// The number of steps in `chain`.
     pub length: u8,
 
-    /// The most significant `Residual`, if any, else `rotation.residual()`.
+    /// The fixed-point at which the [`Chain`] ends: [`Chain::last_residual`].
+    pub fixed_point: Residual,
+
+    /// The most significant `Residual` in [`Chain::residuals`].
     pub last: Residual,
 
-    /// The least significant `Residual`, if any, else `rotation.residual()`.
+    /// The least significant `Residual` in [`Chain::residuals`]
     pub first: Residual,
 }
 
 impl From<Chain> for BCCSummary {
     fn from(chain: Chain) -> Self {
         let length = u8::try_from(chain.residuals.len()).unwrap();
-        let (first, last) = if chain.residuals.len() == 0 {
-            (
-                chain.rotation.residual(),
-                chain.rotation.residual(),
-            )
-        } else {
-            (
-                *chain.residuals.first().unwrap(),
-                *chain.residuals.last().unwrap(),
-            )
-        };
-        Self {rotation: chain.rotation, length, first, last}
+        let fixed_point = chain.last_residual;
+        let last = *chain.residuals.last().expect("Too short");
+        let first = *chain.residuals.first().expect("Too short");
+        Self {length, fixed_point, last, first}
     }
 }
 
@@ -67,14 +59,13 @@ pub struct BCCStatistics {
     /// The number of [`Tree::Leaf`]s.
     pub leaf_count: usize,
 
-    /// For each [`Rotation`], the number of [`Tree::Branch`]es whose `payload`
-    /// is equal to that value.
-    pub short_bcc_counts: HashMap<Rotation, usize>,
+    /// For each [`ShiftedBCC`] that is a fixed point of `arrow()`, the number
+    /// of [`Tree::Branch`]es whose `payload` is that `ShiftedBCC`.
+    pub short_counts: HashMap<Residual, usize>,
 
     /// For each [`BCCSummary`], the number of [`Tree::Branch`]es whose
-    /// `payload`
-    /// matches that summary.
-    pub bcc_counts: HashMap<BCCSummary, usize>,
+    /// `payload` matches that summary.
+    pub long_counts: HashMap<BCCSummary, usize>,
 }
 
 impl BCCStatistics {
@@ -89,9 +80,9 @@ impl BCCStatistics {
     pub fn count_bcc(&mut self, bcc: ShiftedBCC) {
         let chain = Chain::from_bcc(bcc);
         if chain.residuals.len() == 0 {
-            *self.short_bcc_counts.entry(chain.rotation).or_insert(0) += 1;
+            *self.short_counts.entry(chain.last_residual).or_insert(0) += 1;
         } else {
-            *self.bcc_counts.entry(BCCSummary::from(chain)).or_insert(0) += 1;
+            *self.long_counts.entry(BCCSummary::from(chain)).or_insert(0) += 1;
         }
     }
 
@@ -139,19 +130,22 @@ fn main() -> fvq::Result {
     }
     eprintln!();
     println!("leaf_count = {:?}", statistics.leaf_count);
-    for &rotation in &ALL_ROTATIONS {
+    for &fixed_point in &ALL_RESIDUALS {
         println!();
-        println!("short_bcc_counts[{:?}] = {:?}", rotation, statistics.short_bcc_counts.get(&rotation).unwrap_or(&0));
+        println!("Fixed point {:?}", fixed_point);
+        println!("short_count = {:?}", statistics.short_counts.get(&fixed_point).unwrap_or(&0));
         for &last in &ALL_RESIDUALS {
-            println!();
-            println!("Last {:?}", last);
-            for &first in &ALL_RESIDUALS {
-                print!("First {:?}:", first);
-                for length in 1..15 {
-                    let bs = BCCSummary {rotation, length, last, first};
-                    print!(" {:8?}", statistics.bcc_counts.get(&bs).unwrap_or(&0));
-                }
+            if last != fixed_point {
                 println!();
+                println!("Last {:?}", last);
+                for &first in &ALL_RESIDUALS {
+                    print!("First {:?}:", first);
+                    for length in 1..15 {
+                        let bs = BCCSummary {length, fixed_point, last, first};
+                        print!(" {:8?}", statistics.long_counts.get(&bs).unwrap_or(&0));
+                    }
+                    println!();
+                }
             }
         }
     }

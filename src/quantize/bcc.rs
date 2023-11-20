@@ -135,6 +135,13 @@ pub struct Residual(u8);
 impl Residual {
     /// Returns the components of `self`.
     pub fn vhc(self) -> (f32, f32, f32) { RESIDUALS[self.0 as usize] }
+
+    /// Returns the components of the unique [`ShiftedBCC`] `fp` such that
+    /// `fp.arrow()` is `(fp, self)`.
+    pub fn fixed_point(self) -> (f32, f32, f32) {
+        let (v, h, c) = self.vhc();
+        (-2.0 * v, -2.0 * h, -2.0 * c)
+    }
 }
 
 /// All possible [`Residual`]s.
@@ -160,56 +167,20 @@ const SYNDROMES: [[[Residual; 4]; 2]; 2] = [[
 
 // ----------------------------------------------------------------------------
 
-const ROTATIONS: [(f32, f32, f32); 4] = [
-    ( 1.0,  0.0,  0.5),
-    ( 0.0,  1.0, -0.5),
-    (-1.0,  0.0,  0.5),
-    ( 0.0, -1.0, -0.5),
-];
-
-const ROTATION_RESIDUALS: [Residual; 4] = [
-    Residual(2),
-    Residual(4),
-    Residual(3),
-    Residual(5),
-];
-
-/// Represents one of the four shortest `ShiftedBCC`s: the fixed points of
-/// [`ShiftedBCC::arrow()`].
-#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct Rotation(u8);
-
-impl Rotation {
-    /// Returns the components of `self`.
-    pub fn vhc(self) -> (f32, f32, f32) { ROTATIONS[self.0 as usize] }
-
-    /// Returns `½self - self`.
-    pub fn residual(self) -> Residual { ROTATION_RESIDUALS[self.0 as usize] }
-}
-
-/// All possible [`Rotation`]s.
-pub const ALL_ROTATIONS: [Rotation; 4] = [
-    Rotation(0),
-    Rotation(1),
-    Rotation(2),
-    Rotation(3),
-];
-
-// ----------------------------------------------------------------------------
-
 /// Represents a `ShiftedBCC` as a chain of `arrow()`s.
 ///
 /// Each `arrow() operation roughly halves the `ShiftedBCC`, and produces a
-/// [`Residual`]. Eventually the chain reaches a fixed point of `arrow()`,
-/// which is a [`Rotation`] of the bias vector `b`.
+/// [`Residual`]. Eventually the chain reaches a fixed point of `arrow()`.
+/// The fixed point may be deduced from the last `Residual`.
 ///
 /// [`arrow()`]: ShiftedBCC::arrow
 #[derive(Debug, Default, Clone, Hash, PartialEq, Eq)]
 pub struct Chain {
     /// The [`Residual`]s, listed from least to most significant.
     pub residuals: Vec<Residual>,
-    /// The [`Rotation`], which is even more significant.
-    pub rotation: Rotation,
+    /// The last `Residual`, which maps the fixed point to itself.
+    /// It is even more significant.
+    pub last_residual: Residual,
 }
 
 impl Chain {
@@ -217,16 +188,11 @@ impl Chain {
     pub fn from_bcc(mut bcc: ShiftedBCC) -> Self {
         let mut residuals = Vec::new();
         loop {
-            let (half, residual) = bcc.arrow();
-            if bcc == half { break; }
-            residuals.push(residual);
+            let (half, last_residual) = bcc.arrow();
+            if bcc == half { return Chain {residuals, last_residual}; }
+            residuals.push(last_residual);
             bcc = half;
         }
-        let v_bit = (bcc.v + 1) & 2;
-        let h_bit = bcc.h & 2;
-        let c_bit = bcc.c & 1;
-        let rotation = Rotation((v_bit + h_bit + c_bit) as u8);
-        Chain {residuals, rotation}
     }
 
     /// Convert wavelet coefficients to a `Self`.
@@ -236,7 +202,7 @@ impl Chain {
 
     /// Convert self to wavelet coefficients.
     pub fn vhc(&self) -> (f32, f32, f32) {
-        let (mut v, mut h, mut c) = self.rotation.vhc();
+        let (mut v, mut h, mut c) = self.last_residual.fixed_point();
         for r in self.residuals.iter().rev() {
             let (dv, dh, dc) = r.vhc();
             v = (v + dv) * 2.0;
@@ -259,6 +225,17 @@ impl Chain {
 mod tests {
     use super::*;
 
+    const FIXED_POINTS: [(f32, f32, f32); 8] = [
+        ( 0.0, -1.0,  1.5),
+        ( 0.0,  1.0,  1.5),
+        (-1.0,  0.0,  0.5),
+        ( 1.0,  0.0,  0.5),
+        ( 0.0, -1.0, -0.5),
+        ( 0.0,  1.0, -0.5),
+        (-1.0,  0.0, -1.5),
+        ( 1.0,  0.0, -1.5),
+    ];
+
     /// Generate a list of 250 `ShiftedBCC` values.
     fn some_bccs() -> Box<[ShiftedBCC]> {
         const RANGE: [f32; 5] = [-4.0, -2.0, 0.0, 2.0, 4.0];
@@ -276,12 +253,7 @@ mod tests {
 
     #[test]
     fn round_trip() {
-        for (v, h, c) in [
-            ( 0.0, -1.0, -0.5),
-            ( 0.0,  1.0, -0.5),
-            (-1.0,  0.0,  0.5),
-            ( 1.0,  0.0,  0.5),
-        ] {
+        for &(v, h, c) in &FIXED_POINTS {
             let bcc = ShiftedBCC::new(v, h, c);
             assert_eq!(bcc.vhc(), (v, h, c));
         }
@@ -311,28 +283,23 @@ mod tests {
 
     #[test]
     fn short_chain() {
-        for (v, h, c) in [
-            ( 0.0, -1.0, -0.5),
-            ( 0.0,  1.0, -0.5),
-            (-1.0,  0.0,  0.5),
-            ( 1.0,  0.0,  0.5),
-        ] {
+        for &(v, h, c) in &FIXED_POINTS {
             let bcc = ShiftedBCC::new(v, h, c);
             let chain = Chain::from_bcc(bcc);
             assert_eq!(chain.residuals, []);
             assert_eq!(chain.vhc(), (v, h, c));
             let (bcc2, residual) = bcc.arrow();
             assert_eq!(bcc, bcc2);
-            assert_eq!(residual, chain.rotation.residual());
+            assert_eq!(residual, chain.last_residual);
         }
     }
 
     #[test]
     fn long_chain() {
-        let bcc = ShiftedBCC::new(8.0, -13.0, -4.5);
-        let chain = Chain::from_bcc(bcc);
-        assert_eq!(chain.residuals.len(), 4);
-        let new_bcc = chain.to_bcc();
-        assert_eq!(bcc, new_bcc);
+        for &bcc in some_bccs().iter() {
+            let chain = Chain::from_bcc(bcc);
+            let new_bcc = chain.to_bcc();
+            assert_eq!(bcc, new_bcc);
+        }
     }
 }
