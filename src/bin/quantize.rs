@@ -6,12 +6,12 @@ use fvq::quantize::{to_digital, from_digital};
 
 fn main() -> fvq::Result {
     let args = cli::InOutOrder::parse();
+    let order = args.order(5);
     let in_pixels = load_image(&args.in_path)?;
     let in_pixels: Array<Grid, f32> = match in_pixels {
-        Pixels::L(pa) => pa.column(L).collect(),
+        Pixels::L(pa) => pa.crop_to_multiple(1 << order).column(L).collect(),
         _ => Err(Error("Image must only have a luma channel"))?,
     };
-    let order = args.order(5);
     let mut pyramid = Pyramid::from_pixels(order, true, in_pixels);
     pyramid.size().each(|yx| {
         let low = pyramid[yx];
