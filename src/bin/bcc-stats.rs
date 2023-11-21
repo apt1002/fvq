@@ -59,6 +59,10 @@ pub struct BCCStatistics {
     /// The number of [`Tree::Leaf`]s.
     pub leaf_count: usize,
 
+    /// For each length, the number of [`Tree::Branch`]es whose payload, as a
+    /// [`Chain`], has that length.
+    pub length_counts: [usize; 16],
+
     /// For each [`ShiftedBCC`] that is a fixed point of `arrow()`, the number
     /// of [`Tree::Branch`]es whose `payload` is that `ShiftedBCC`.
     pub short_counts: HashMap<Residual, usize>,
@@ -80,6 +84,7 @@ impl BCCStatistics {
     pub fn count_bcc(&mut self, bcc: ShiftedBCC) {
         let chain = Chain::from_bcc(bcc);
         let chain = chain.apply_symmetry(chain.last_residual.recommend_symmetry());
+        self.length_counts[chain.residuals.len()] += 1;
         if chain.residuals.len() == 0 {
             *self.short_counts.entry(chain.last_residual).or_insert(0) += 1;
         } else {
@@ -133,6 +138,7 @@ fn main() -> fvq::Result {
     eprintln!();
     println!("pixel_count = {:?}", pixel_count);
     println!("leaf_count = {:?}", statistics.leaf_count);
+    println!("length_counts = {:?}", statistics.length_counts);
     for fixed_point in [ALL_RESIDUALS[0], ALL_RESIDUALS[4]] {
         println!();
         println!("Fixed point {:?}", fixed_point);
@@ -143,7 +149,7 @@ fn main() -> fvq::Result {
                 println!("Last {:?}", last);
                 for &first in &ALL_RESIDUALS {
                     print!("First {:?}:", first);
-                    for length in 1..15 {
+                    for length in 1..12 {
                         let bs = BCCSummary {length, fixed_point, last, first};
                         print!(" {:8?}", statistics.long_counts.get(&bs).unwrap_or(&0));
                     }
