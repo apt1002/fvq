@@ -53,7 +53,7 @@ More to come!
 
 ## Status
 
-This is a work in progress. Some parts of the algorithm are working, and others
+This is a work in progress (#3). Some parts of the algorithm are working, and others
 are not yet written. I have not yet reached the point where I can generate a
 compressed image file.
 
