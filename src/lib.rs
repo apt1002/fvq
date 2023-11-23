@@ -29,8 +29,8 @@ pub type Small = (bool, bool);
 
 pub mod io;
 
-mod tile;
-pub use tile::{Tile, Tree, Branch};
+mod quad;
+pub use quad::{Quad, Tree, Branch};
 
 pub mod transform;
 pub use transform::{Position, Pyramid, VHC};

@@ -1,6 +1,6 @@
 use multidimension::{View, NewView, Array};
 
-use super::{Tile, Tree, VHC};
+use super::{Quad, Tree, VHC};
 use super::transform::{Haar};
 
 mod bcc;
@@ -40,7 +40,7 @@ fn to_digital_inner(low: f32, tree: &Tree<Array<VHC, f32>>, gain: f32) -> (Tree<
             let new_h = tolerance * bcc.h();
             let new_c = tolerance * bcc.c();
             let haar = Haar::new(low, new_v, new_h, new_c).transform();
-            let children = Tile::new_view(((), ()), |buffer| {
+            let children = Quad::new_view(((), ()), |buffer| {
                 haar.zip(branch.children.as_ref()).each(|(child_low, child)| {
                     let (child, child_error_norm, child_leaf_norm) = to_digital_inner(child_low, child, gain * 2.0);
                     branch_error_norm += child_error_norm;
@@ -111,9 +111,9 @@ mod tests {
         let low = 0.5;
         let digital = Tree::branch(
             ShiftedBCC::new(2.0, -1.0, -0.5),
-            Tile::new(Tree::Leaf, Tree::Leaf, Tree::Leaf, Tree::branch(
+            Quad::new(Tree::Leaf, Tree::Leaf, Tree::Leaf, Tree::branch(
                 ShiftedBCC::new(1.0, -2.0, 0.5),
-                Tile::new(Tree::Leaf, Tree::Leaf, Tree::Leaf, Tree::Leaf),
+                Quad::new(Tree::Leaf, Tree::Leaf, Tree::Leaf, Tree::Leaf),
             )),
         );
         let analogue = from_digital(2, low, &digital);

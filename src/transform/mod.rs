@@ -1,5 +1,5 @@
 use multidimension::{Index, View, Scalar, Array};
-use super::{Grid, Small, Tile, Tree};
+use super::{Grid, Small, Quad, Tree};
 
 mod haar;
 pub use haar::{Haar, to_haar, from_haar};

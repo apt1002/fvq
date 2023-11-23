@@ -1,14 +1,14 @@
 use multidimension::{View, NewView, Array};
 
-use super::{Grid, Small, Tile};
+use super::{Grid, Small, Quad};
 
 /// A 2x2 grid of `f32`s
 #[derive(Debug, Copy, Clone)]
-pub struct Haar(pub Tile<f32>);
+pub struct Haar(pub Quad<f32>);
 
 impl Haar {
     pub fn new(a: f32, b: f32, c: f32, d: f32) -> Self {
-        Haar(Tile::new(a, b, c, d))
+        Haar(Quad::new(a, b, c, d))
     }
 
     /// Transforms `v`. The transformation is its own inverse.
@@ -28,7 +28,7 @@ impl Haar {
 }
 
 impl std::ops::Deref for Haar {
-    type Target = Tile<f32>;
+    type Target = Quad<f32>;
     fn deref(&self) -> &Self::Target { &self.0 }
 }
 
@@ -37,9 +37,9 @@ impl std::ops::DerefMut for Haar {
 }
 
 impl NewView for Haar {
-    type Buffer = <Tile<f32> as NewView>::Buffer;
+    type Buffer = <Quad<f32> as NewView>::Buffer;
     fn new_view(size: ((), ()), callback: impl FnOnce(&mut Self::Buffer)) -> Self {
-        Haar(Tile::<f32>::new_view(size, callback))
+        Haar(Quad::<f32>::new_view(size, callback))
     }
 }
 

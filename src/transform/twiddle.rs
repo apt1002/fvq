@@ -53,19 +53,19 @@ pub fn twiddle<const IS_INVERSE: bool>(hs: &mut[Haar]) {
     }
 }
 
-fn twiddle_columns<const IS_INVERSE: bool>(tiles: Array<Grid, Haar>) -> Array<Grid, Haar> {
-    let (height, _) = tiles.size();
-    tiles.columns::<usize, usize>().map(|column| {
+fn twiddle_columns<const IS_INVERSE: bool>(quads: Array<Grid, Haar>) -> Array<Grid, Haar> {
+    let (height, _) = quads.size();
+    quads.columns::<usize, usize>().map(|column| {
         let mut column: Array<usize, Haar> = column.map(Haar::transpose).collect();
         twiddle::<IS_INVERSE>(column.as_mut());
         column
     }).nested_collect(height)
 }
 
-pub fn twiddle_grid<const IS_INVERSE: bool>(tiles: Array<Grid, Haar>) -> Array<Grid, Haar> {
-    let tiles = twiddle_columns::<IS_INVERSE>(tiles);
-    let tiles = twiddle_columns::<IS_INVERSE>(tiles);
-    tiles
+pub fn twiddle_grid<const IS_INVERSE: bool>(quads: Array<Grid, Haar>) -> Array<Grid, Haar> {
+    let quads = twiddle_columns::<IS_INVERSE>(quads);
+    let quads = twiddle_columns::<IS_INVERSE>(quads);
+    quads
 }
 
 //----------------------------------------------------------------------
