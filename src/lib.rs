@@ -30,7 +30,7 @@ pub type Small = (bool, bool);
 pub mod io;
 
 mod quad;
-pub use quad::{Quad, Tree, Branch};
+pub use quad::{Quad, Tree, Branch, Path, TreeTop};
 
 pub mod transform;
 pub use transform::{Position, Pyramid, VHC};
