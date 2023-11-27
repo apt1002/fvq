@@ -1,4 +1,4 @@
-use multidimension::{Index, View, impl_ops_for_view};
+use multidimension::{Index, View, ViewRef, ViewMut, impl_ops_for_view, impl_ops_for_memoryview};
 
 use super::{Small};
 
@@ -24,21 +24,6 @@ impl<T> Quad<T> {
     }
 }
 
-// TODO: Implement `ViewRef` instead.
-impl<T> std::ops::Index<Small> for Quad<T> {
-    type Output = T;
-    fn index(&self, index: Small) -> &Self::Output {
-        &self.0[index.0 as usize][index.1 as usize]
-    }
-}
-
-// TODO: Implement `ViewMut` instead.
-impl<T> std::ops::IndexMut<Small> for Quad<T> {
-    fn index_mut(&mut self, index: Small) -> &mut Self::Output {
-        &mut self.0[index.0 as usize][index.1 as usize]
-    }
-}
-
 impl<T: Clone> View for Quad<T> {
     type I = Small;
     type T = T;
@@ -46,7 +31,20 @@ impl<T: Clone> View for Quad<T> {
     fn at(&self, index: Self::I) -> Self::T { self[index].clone() }
 }
 
+impl<T: Clone> ViewRef for Quad<T> {
+    fn at_ref(&self, index: Self::I) -> &Self::T {
+        &self.0[index.0 as usize][index.1 as usize]
+    }
+}
+
+impl<T: Clone> ViewMut for Quad<T> {
+    fn at_mut(&mut self, index: Self::I) -> &mut Self::T {
+        &mut self.0[index.0 as usize][index.1 as usize]
+    }
+}
+
 impl_ops_for_view!(Quad<T: Clone>);
+impl_ops_for_memoryview!(Quad<T: Clone>);
 
 // ----------------------------------------------------------------------------
 
