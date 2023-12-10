@@ -42,23 +42,24 @@ impl BitString {
     }
 
     /// Returns an [`Iterator`] through the bits of this `BitString`.
-    pub fn iter(&self) -> Iter { self.into_iter() }
+    pub fn iter(&self) -> BitIter { self.into_iter() }
 }
 
 impl<'a> IntoIterator for &'a BitString {
     type Item = bool;
-    type IntoIter = Iter<'a>;
-    fn into_iter(self) -> Self::IntoIter { Iter {bs: self, pos: 0} }
+    type IntoIter = BitIter<'a>;
+    fn into_iter(self) -> Self::IntoIter { BitIter {bs: self, pos: 0} }
 }
 
 // ----------------------------------------------------------------------------
 
-pub struct Iter<'a> {
+#[derive(Debug, Clone)]
+pub struct BitIter<'a> {
     bs: &'a BitString,
     pos: usize,
 }
 
-impl<'a> Iterator for Iter<'a> {
+impl<'a> Iterator for BitIter<'a> {
     type Item = bool;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -83,8 +84,8 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
-impl<'a> std::iter::ExactSizeIterator for Iter<'a> {}
-impl<'a> std::iter::FusedIterator for Iter<'a> {}
+impl<'a> std::iter::ExactSizeIterator for BitIter<'a> {}
+impl<'a> std::iter::FusedIterator for BitIter<'a> {}
 
 // ----------------------------------------------------------------------------
 

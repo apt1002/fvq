@@ -1,5 +1,5 @@
 mod bits;
-pub use bits::{BitString};
+pub use bits::{BitString, BitIter};
 
 mod arithmetic;
-pub use arithmetic::{Split, Reader, Writer};
+pub use arithmetic::{Split, FAIR, Reader, Writer};

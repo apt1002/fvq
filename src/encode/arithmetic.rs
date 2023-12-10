@@ -1,15 +1,16 @@
 use std::cmp::{min, max};
-use std::io::{Read, Write, Result};
+
+use super::{BitString, BitIter};
 
 const SCALE: u64 = 1 << 32;
+const HALF: u64 = SCALE / 2;
+const QUARTER: u64 = SCALE / 4;
 
 /// Divide by `SCALE` rounding to even.
 fn divide_by_scale(x: u64) -> u32 {
     let nudge = (x / SCALE) & 1;
-    ((x + (SCALE / 2 - 1) + nudge) / SCALE) as u32
+    ((x + (HALF - 1) + nudge) / SCALE) as u32
 }
-
-fn eof() -> std::io::Error { std::io::ErrorKind::UnexpectedEof.into() }
 
 // ----------------------------------------------------------------------------
 
@@ -40,10 +41,13 @@ impl Split {
     }
 }
 
+/// An equal [`Split`]: `true` and `false` have equal probability.
+pub const FAIR: Split = Split {p1: HALF as u32};
+
 // ----------------------------------------------------------------------------
 
 /// Represents an interval inside [0, 1].
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone, Hash, PartialEq, Eq)]
 struct Interval {
     /// The lower bound minus `0`, times `SCALE`.
     below: u32,
@@ -63,25 +67,24 @@ impl Interval {
     pub fn split(self, model: Split) -> (Self, Self) {
         let p1 = model.p1 as u64;
         let p0 = SCALE - p1;
-        let below = divide_by_scale(self.below as u64 * p1 + (SCALE * p0) - self.above as u64 * p0);
-        let above = divide_by_scale(self.above as u64 * p0 + (SCALE * p1) - self.below as u64 * p1);
+        let below = divide_by_scale(self.below as u64 * p1 + SCALE * p0 - self.above as u64 * p0);
+        let above = divide_by_scale(self.above as u64 * p0 + SCALE * p1 - self.below as u64 * p1);
         assert_eq!(below.wrapping_add(above), 0);
         (Self::new(self.below, above), Self::new(below, self.above))
     }
 
-    /// Equivalent to, but more efficient than, `self.split(Split::new(0.5))`.
+    /// Equivalent to, but more efficient than, `self.split(FAIR)`.
     #[must_use]
     pub fn half(self) -> (Self, Self) {
-        const HALF: u64 = SCALE / 2;
-        let below = divide_by_scale(self.below as u64 * HALF + HALF - self.above as u64 * HALF);
-        let above = divide_by_scale(self.above as u64 * HALF + HALF - self.below as u64 * HALF);
+        let below = divide_by_scale(self.below as u64 * HALF + SCALE * HALF - self.above as u64 * HALF);
+        let above = divide_by_scale(self.above as u64 * HALF + SCALE * HALF - self.below as u64 * HALF);
         assert_eq!(below.wrapping_add(above), 0);
         (Self::new(self.below, above), Self::new(below, self.above))
     }
 
     /// Returns `true` if `self` contains (inclusive) `other`.
     pub fn contains(self, other: Self) -> bool {
-        self.below < other.below && self.above < other.above
+        self.below <= other.below && self.above <= other.above
     }
 
     /// Applies a twofold enlargement that maps `half` to `WHOLE`.
@@ -90,7 +93,7 @@ impl Interval {
     /// Candidates for `half` include `LOWER`, `MIDDLE` and `UPPER`.
     pub fn grow(&mut self, half: Interval) {
         assert!(half.contains(*self));
-        assert_eq!(half.below + half.above, (SCALE / 2) as u32);
+        assert_eq!(half.below + half.above, HALF as u32);
         self.below = 2 * (self.below - half.below);
         self.above = 2 * (self.above - half.above);
     }
@@ -100,55 +103,26 @@ impl Interval {
 const WHOLE: Interval = Interval {below: 0, above: 0};
 
 /// The lower Interval [0, 0.5].
-const LOWER: Interval = Interval {below: 0, above: (SCALE / 2) as u32};
+const LOWER: Interval = Interval {below: 0, above: HALF as u32};
 
 /// The middle Interval [0.25, 0.25].
-const MIDDLE: Interval = Interval {below: (SCALE / 4) as u32, above: (SCALE / 4) as u32};
+const MIDDLE: Interval = Interval {below: QUARTER as u32, above: QUARTER as u32};
 
 /// The upper Interval [0.5, 1].
-const UPPER: Interval = Interval {below: (SCALE / 2) as u32, above: 0};
-
-// ----------------------------------------------------------------------------
-
-/// Reads a stream of bits.
-#[derive(Debug)]
-pub struct BitReader<T: Read> {
-    inner: T,
-    buffer: [u8; 1],
-    bit: u8,
-}
-
-impl<T: Read> BitReader<T> {
-    pub fn new(inner: T) -> Self { Self {inner, buffer: [0], bit: 0} }
-
-    /// Read one bit.
-    pub fn read(&mut self) -> Result<bool> {
-        if self.bit == 0 {
-            let n = self.inner.read(&mut self.buffer)?;
-            if n < 1 { Err(eof())? }
-            self.bit = 1;
-        }
-        let ret = (self.buffer[0] & self.bit) != 0;
-        self.bit <<= 1;
-        Ok(ret)
-    }
-
-    /// Skip padding.
-    pub fn close(self) -> T { self.inner }
-}
+const UPPER: Interval = Interval {below: HALF as u32, above: 0};
 
 // ----------------------------------------------------------------------------
 
 /// Read arithmetic-encoded data.
 #[derive(Debug)]
-pub struct Reader<T: Read> {
-    inner: BitReader<T>,
+pub struct Reader<'a> {
+    inner: BitIter<'a>,
     unfair: Interval,
     fair: Interval,
 }
 
-impl<T: Read> Reader<T> {
-    pub fn new(inner: BitReader<T>) -> Self {
+impl<'a> Reader<'a> {
+    pub fn new(inner: BitIter<'a>) -> Self {
         Self {inner, unfair: WHOLE, fair: WHOLE}
     }
 
@@ -160,8 +134,8 @@ impl<T: Read> Reader<T> {
         true
     }
 
-    /// Read one biased bit.
-    pub fn read(&mut self, model: Split) -> Result<bool> {
+    /// Read one biased bit. Returns `None` if the data is exhausted.
+    pub fn read(&mut self, model: Split) -> Option<bool> {
         assert!(self.unfair.contains(self.fair));
         // Subdivide.
         let data: bool;
@@ -170,7 +144,11 @@ impl<T: Read> Reader<T> {
             if i0.contains(self.fair) { data = false; self.unfair = i0; break; }
             if i1.contains(self.fair) { data = true; self.unfair = i1; break; }
             let (h0, h1) = self.fair.half();
-            self.fair = if self.inner.read()? { h1 } else { h0 };
+            if let Some(bit) = self.inner.next() {
+                self.fair = if bit { h1 } else { h0 };
+            } else {
+                return None;
+            }
         }
         // Grow to the working range.
         loop {
@@ -179,11 +157,11 @@ impl<T: Read> Reader<T> {
             break;
         }
         while self.grow(MIDDLE) {}
-        Ok(data)
+        Some(data)
     }
 
     /// Skip padding.
-    pub fn close(self) -> BitReader<T> {
+    pub fn close(self) -> BitIter<'a> {
         assert!(self.unfair.contains(self.fair));
         self.inner
     }
@@ -191,51 +169,16 @@ impl<T: Read> Reader<T> {
 
 // ----------------------------------------------------------------------------
 
-/// Writes a stream of bits.
-#[derive(Debug)]
-pub struct BitWriter<T: Write> {
-    inner: T,
-    buffer: [u8; 1],
-    bit: u8,
-}
-
-impl<T: Write> BitWriter<T> {
-    pub fn new(inner: T) -> Self {
-        Self {inner, buffer: [0], bit: 1}
-    }
-
-    /// Write one bit.
-    pub fn write(&mut self, data: bool) -> Result<()> {
-        if data { self.buffer[0] |= self.bit };
-        self.bit <<= 1;
-        if self.bit == 0 {
-            let n = self.inner.write(&mut self.buffer)?;
-            if n < 1 { Err(eof())? }
-            self.buffer = [0];
-            self.bit = 1;
-        }
-        Ok(())
-    }
-
-    /// Pad as necessary to write all data.
-    pub fn close(mut self) -> Result<T> {
-        while self.bit != 1 { self.write(false)?; }
-        Ok(self.inner)
-    }
-}
-
-// ----------------------------------------------------------------------------
-
 /// Write arithmetic-encoded data.
 #[derive(Debug)]
-pub struct Writer<T: Write> {
-    inner: BitWriter<T>,
+pub struct Writer {
+    inner: BitString,
     unfair: Interval,
     middle_count: usize,
 }
 
-impl<T: Write> Writer<T> {
-    pub fn new(inner: BitWriter<T>) -> Self {
+impl Writer {
+    pub fn new(inner: BitString) -> Self {
         Self {inner, unfair: WHOLE, middle_count: 0}
     }
 
@@ -248,41 +191,39 @@ impl<T: Write> Writer<T> {
 
     /// Write `data` then `middle_count` copies of `!data`.
     /// Reset `middle_count`.
-    fn inner_write(&mut self, data: bool) -> Result<()> {
-        self.inner.write(data)?;
-        for _ in 0..self.middle_count { self.inner.write(!data)?; }
+    fn inner_write(&mut self, data: bool) {
+        self.inner.push(data);
+        for _ in 0..self.middle_count { self.inner.push(!data); }
         self.middle_count = 0;
-        Ok(())
     }
 
-    pub fn write(&mut self, model: Split, data: bool) -> Result<()> {
+    pub fn write(&mut self, model: Split, data: bool) {
         // Subdivide.
         let (i0, i1) = self.unfair.split(model);
         self.unfair = if data { i1 } else { i0 };
         // Grow to the working range.
         loop {
-            if self.grow(LOWER) { self.inner_write(false)?; continue; }
-            if self.grow(UPPER) { self.inner_write(true)?; continue; }
+            if self.grow(LOWER) { self.inner_write(false); continue; }
+            if self.grow(UPPER) { self.inner_write(true); continue; }
             break;
         }
         while self.grow(MIDDLE) { self.middle_count += 1; }
-        Ok(())
     }
 
     /// Pad as necessary to write all data.
-    pub fn close(mut self) -> Result<BitWriter<T>> {
+    pub fn close(mut self) -> BitString {
         if self.unfair.above > self.unfair.below {
-            self.inner_write(false)?;
+            self.inner_write(false);
             if self.unfair.below > 0 {
-                self.inner_write(true)?;
+                self.inner_write(true);
             }
         } else if self.unfair.below > self.unfair.above {
-            self.inner_write(true)?;
+            self.inner_write(true);
             if self.unfair.above > 0 {
-                self.inner_write(false)?;
+                self.inner_write(false);
             }
         }
-        Ok(self.inner)
+        self.inner
     }
 }
 
@@ -293,14 +234,51 @@ mod tests {
     use super::*;
 
     #[test]
+    fn half() {
+        assert_eq!(WHOLE.split(FAIR), (LOWER, UPPER));
+        assert_eq!(WHOLE.half(), (LOWER, UPPER));
+    }
+
+    #[test]
     fn split() {
         let model = Split::new_inner((SCALE / 8) as u32);
         let (i0, i1) = MIDDLE.split(model);
-        println!("i0 = {:x?}", i0);
-        println!("i1 = {:x?}", i1);
         assert_eq!(i0.below, MIDDLE.below);
         assert_eq!(i0.above, (SCALE * 5 / 16) as u32);
         assert_eq!(i1.below, (SCALE * 11 / 16) as u32);
         assert_eq!(i1.above, MIDDLE.above);
     }
+
+    fn check(split: Split) {
+        for length in 0..8 {
+            for pattern in 0..(1 << length) {
+                let bits: Vec<bool> = (0..length).map(|pos| (pattern & (1 << pos)) != 0).collect();
+                println!();
+                println!("bits = {:?}", bits);
+                let mut w = Writer::new(BitString::default());
+                for &bit in &bits {
+                    w.write(split, bit)
+                }
+                let bs = w.close();
+                println!("bs = {:?}", bs);
+                let mut r = Reader::new(bs.iter());
+                for &bit in &bits {
+                    let bit2 = r.read(split).unwrap();
+                    assert_eq!(bit, bit2);
+                }
+                println!("r = {:?}", r);
+                let mut it = r.close();
+                assert!(it.next().is_none());
+            }
+        }
+    }
+
+    #[test]
+    fn fair() { check(FAIR); }
+
+    #[test]
+    fn unfair() { check(Split::new_ratio(2, 5)); }
+
+    #[test]
+    fn very_unfair() { check(Split::new_ratio(6, 1)); }
 }
