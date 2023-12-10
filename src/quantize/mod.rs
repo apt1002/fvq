@@ -6,9 +6,6 @@ use super::transform::{Haar};
 mod bcc;
 pub use bcc::{ShiftedBCC, Symmetry, ALL_SYMMETRIES, Residual, ALL_RESIDUALS, Chain};
 
-mod arithmetic;
-pub use arithmetic::{Split, Reader, Writer};
-
 // ----------------------------------------------------------------------------
 
 fn tolerance(linear: f32) -> f32 {
