@@ -36,3 +36,5 @@ pub mod transform;
 pub use transform::{Position, Pyramid, VHC};
 
 pub mod quantize;
+
+pub mod encode;
