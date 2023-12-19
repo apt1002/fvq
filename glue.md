@@ -105,11 +105,30 @@ It therefore has 15 - 4 = 11 generators. If we reorder the wavelet coefficients 
     Cd Hb Vc Cp
 ```
 
-We find that five of the generators are in BCC^5:
+we find that five of the generators are in BCC^5:
 
 ```
         1  1  1         0  0  0         0  0  0         0  0  0         0  0  0
      0  0  0  0      0  0  1  0      0  0  0  1      1  0  0  0      0  1  0  0
      0  0  0  0      0  0  0  1      0  1  0  0      1  0  0  0      0  0  1  0
      0  0  0  0      0  1  0  0      0  0  1  0      1  0  0  0      0  0  0  1
+```
+
+and the other six are in G^5:
+
+```
+        1  0  0         0  1  0         0  0  1
+     1  1  0  0      1  0  1  0      1  0  0  1
+     0  0  0  0      0  0  0  0      0  0  0  0
+     0  0  0  0      0  0  0  0      0  0  0  0
+
+        1  0  0         0  1  0
+     0  0  0  0      0  0  0  0
+     1  1  0  0      1  0  1  0
+     0  0  0  0      0  0  0  0
+
+        1  0  0
+     0  0  0  0
+     0  0  0  0
+     1  1  0  0
 ```
