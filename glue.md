@@ -135,12 +135,41 @@ The other six generators are all in G^5:
      1  1  0  0
 ```
 
-These generate a suitable subgroup of G^5 which, when added to BCC^5, yields a 15-dimensional lattice with many shortest vectors of norm 3, and lots more of norm 4. I will call this lattice H15.
+### The H15 lattice
+
+The Hamming code generates a suitable subgroup of G^5 which, when added to BCC^5, yields a 15-dimensional lattice with many shortest vectors of norm 3, and lots more of norm 4. I will call this lattice H15.
 
 H15 is similar to the Barnes-Wall 16-dimensional lattice. One dimension has been removed by projecting all points of the lattice into the space orthogonal to it. This has shortened some vectors slightly. In addition, one of the generators (the one all of whose components are ½) is missing from H15, because it is not in G^5.
 
 G contains elements such as (½, ½, 0) which I didn't use at all in constructing H15. Five copies of (½, ½, 0) can be concatenated to make a vector of norm 2½, which has order 4 modulo BCC^5. However, it doesn't seem to be compatible with the Hamming code. I have not yet found a satisfactory way of using such elements of G.
 
-### Hadamard code
+The dual lattice H15* is constructed from BCC^5 by adding the subgroup of G^5 corresponding to the Hamming code parity checks:
 
-The dual lattice H15* is constructed ...
+```
+        0  ½  ½         0  0  0         ½  0  ½         0  0  0
+     0  0  ½  ½      0  0  0  0      0  ½  0  ½      ½  ½  ½  ½
+     0  0  ½  ½      ½  ½  ½  ½      0  ½  0  ½      0  0  0  0
+     0  0  ½  ½      ½  ½  ½  ½      0  ½  0  ½      ½  ½  ½  ½
+```
+
+## A larger glued lattice
+
+Having constructed quantisation lattices for 2×2 pixels and for 4×4 pixels, how should we generalise to larger tiles such as 32×32? Here are several ways:
+
+### Option 1
+
+Add to BCC^341 a subgroup of G^341 corresponding to the 1023-bit Hamming code.
+
+This constructs a bad lattice, with too many points. Every pattern of 0s and 1s can be rounded onto a lattice vector by toggling at most one bit. The lattice has roughly the same number of points as Z^1023 (fewer by only a factor of 1024) and roughly the same mean quantisation error, i.e. it is worse than BCC^341. Furthermore, its nearest-neighbour algorithm is computationaly intractible.
+
+### Option 2
+
+Construct the lattice that contains a 1023-dimensional point iff every "family" of a parent triplet and four child triplets belongs to H15.
+
+This lattice has some surprisingly long basis vectors, because changes in one family of triplets ripple into neighbouring families (i.e. from sibling to sibling or from parent to child). For example, any lattice vectror in which the root triplet (the one from the fifth generation of wavelets) is non-zero modulo BCC must have a norm of at least 63.
+
+### Option 3
+
+Construct the dual of the lattice which contains a 1023-dimensional point iff every family belongs to H15*.
+
+This lattice has some surprisingly long parity check vectors. Its shortest vectors, in contrast, all look like the shortest vectors of H15, and they are of norm 3 and 4.
