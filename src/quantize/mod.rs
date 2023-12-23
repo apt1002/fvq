@@ -3,6 +3,8 @@ use multidimension::{View, NewView, Array};
 use super::{Quad, Tree, VHC};
 use super::transform::{Haar};
 
+mod lattice;
+
 mod bcc;
 pub use bcc::{ShiftedBCC, Symmetry, ALL_SYMMETRIES, Residual, ALL_RESIDUALS, Chain};
 
