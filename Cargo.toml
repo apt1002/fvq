@@ -12,3 +12,5 @@ multidimension = "0.3.3"
 num-traits = "0.2.16"
 image = { version = "0.24.7", default-features = false, features = ["png", "pnm", "jpeg", "qoi", "webp"] }
 clap = { version = "4.4.6", features = ["derive"] }
+vector-space = "0.3.0"
+simple-vectors = "0.2.0"

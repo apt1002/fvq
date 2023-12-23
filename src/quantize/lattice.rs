@@ -1,133 +1,64 @@
-use std::fmt::{Debug};
-use std::ops::{Add, Sub, Mul, Neg};
+use std::ops::{Add, Sub, Neg};
+use num_traits::{Zero, ToPrimitive};
+use num_traits::real::{Real};
+use vector_space::{VectorSpace, InnerSpace};
+use simple_vectors::{Vector};
 
-pub trait Vector:
-    Debug + Clone + PartialEq +
-    Add<Self, Output=Self> +
-    Sub<Self, Output=Self> +
-    Neg<Output=Self>
+/// An integral lattice.
+///
+/// This is an integral lattice; i.e. the dot product of any two lattice
+/// vectors must be an integer.
+pub trait Lattice<const N: usize>: Copy + Zero + PartialEq where
+    Self: Add<Output = Self>,
+    Self: Sub<Output = Self>,
+    Self: Neg<Output = Self>,
 {
-    /// The additive identity.
-    const ZERO: Self;
+    /// The analogue vector space that this `Lattice` approximates.
+    type V: InnerSpace;
 
-    /// Multiply by an integer.
-    fn scale(self, other: isize) -> Self;
-
-    /// Dot product.
-    fn dot(self, other: Self) -> f32;
-
-    /// Dot product with `self`.
-    fn norm(self) -> f32 { self.clone().dot(self) }
-}
-
-impl Vector for f32 {
-    const ZERO: Self = 0.0;
-    fn scale(self, other: isize) -> Self { self * (other as f32)}
-    fn dot(self, other: Self) -> f32 { self * other }
-    fn norm(self) -> f32 { self * self }
-}
-
-impl Vector for i16 {
-    const ZERO: Self = 0;
-    fn scale(self, other: isize) -> Self { self * (other as i16)}
-    fn dot(self, other: Self) -> f32 { self as f32 * other as f32}
-    fn norm(self) -> f32 { self as f32 * self as f32 }
-}
-
-// ----------------------------------------------------------------------------
-
-/// Represents a [`Vector`] with `N` elements of type `T`.
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct Point<T, const N: usize>(pub [T; N]);
-
-impl<T, const N: usize> IntoIterator for Point<T, N> {
-    type Item = T;
-    type IntoIter = <[T; N] as IntoIterator>::IntoIter;
-    fn into_iter(self) -> Self::IntoIter { self.0.into_iter() }
-}
-
-impl<T, const N: usize> FromIterator<T> for Point<T, N> {
-    fn from_iter<I>(iter: I) -> Self where I: IntoIterator<Item=T> {
-        Point(Vec::from_iter(iter).try_into().unwrap_or_else(
-            |v: Vec<T>| panic!("Expected {} elements but got {}", N, v.len())
-        ))
-    }
-}
-
-impl<T, U, const N: usize> Add<Point<U, N>> for Point<T, N> where T: Add<U> {
-    type Output = Point<<T as Add<U>>::Output, N>;
-
-    fn add(self, other: Point<U, N>) -> Self::Output {
-        self.into_iter().zip(other.into_iter()).map(|(x, y)| x + y).collect()
-    }
-}
-
-impl<T, U, const N: usize> Sub<Point<U, N>> for Point<T, N> where T: Sub<U> {
-    type Output = Point<<T as Sub<U>>::Output, N>;
-
-    fn sub(self, other: Point<U, N>) -> Self::Output {
-        self.into_iter().zip(other.into_iter()).map(|(x, y)| x - y).collect()
-    }
-}
-
-impl<T, U, const N: usize> Mul<Point<U, N>> for Point<T, N> where T: Mul<U> {
-    type Output = Point<<T as Mul<U>>::Output, N>;
-
-    fn mul(self, other: Point<U, N>) -> Self::Output {
-        self.into_iter().zip(other.into_iter()).map(|(x, y)| x * y).collect()
-    }
-}
-
-impl<T, const N: usize> Neg for Point<T, N> where T: Neg {
-    type Output = Point<<T as Neg>::Output, N>;
-
-    fn neg(self) -> Self::Output {
-        self.into_iter().map(|x| -x).collect()
-    }
-}
-
-impl<T, const N: usize> Vector for Point<T, N> where T: Vector {
-    const ZERO: Self = Point([T::ZERO; N]);
-
-    fn scale(self, other: isize) -> Self {
-        self.into_iter().map(|x| x.scale(other)).collect()
-    }
-
-    fn dot(self, other: Self) -> f32 {
-        self.into_iter().zip(other.into_iter()).map(|(x, y)| x.dot(y)).sum()
-    }
-
-    fn norm(self) -> f32 {
-        self.into_iter().map(|x| x.norm()).sum()
-    }
-}
-
-// ----------------------------------------------------------------------------
-
-/// An `N`-dimensional quantisation lattice.
-pub trait Lattice<const N: usize>: Vector {
-    /// Round `data` to the nearest `Self`.
-    /// Also return the [`norm()`] of the quantisation error.
+    /// Rounds `analogue` to the nearest `Self`.
+    /// Also returns the [`norm`] of the quantisation error, which is
+    /// `analogue - Self::to_digital(analogue).to_analogue()`.
     ///
-    /// [`norm()`]: Vector::norm()
-    fn to_digital(data: [f32; N]) -> Self;
+    /// [`norm`]: InnerSpace::magnitude2()
+    fn to_digital(analogue: Self::V) -> (Self, <Self::V as VectorSpace>::Scalar);
 
-    /// Compute the coordinates of `Self`.
-    fn to_analogue(data: Self) -> [f32; N];
+    /// Converts `self` to an analogue vector.
+    fn to_analogue(self) -> Self::V;
+
+    /// Returns the scalar product of `self` and `other`, which must be an
+    /// integer.
+    ///
+    /// The default implementation converts `self` and `other` to analogue
+    /// vectors and then takes their scalar product.
+    fn scalar(self, other: Self) -> u64 {
+        self.to_analogue().scalar(other.to_analogue()).round().to_u64().expect("Overflow")
+    }
+
+    /// Returns the L2 norm of `self`, which must be an integer.
+    fn magnitude2(self) -> u64 { self.clone().scalar(self) }
 }
 
-// ----------------------------------------------------------------------------
+impl Lattice<1> for i32 {
+    type V = f32;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+    fn to_digital(analogue: Self::V) -> (Self, f32) {
+        let ret = analogue.round().to_i32().expect("Overflow");
+        let error = analogue - ret.to_analogue();
+        (ret, error.magnitude2())
+    }
 
-    #[test]
-    fn vector_f32() {
-        let a = Point([3.0, 4.0]);
-        let b = Point([-1.0, 1.0]);
-        assert_eq!(a.scale(2), Point([6.0, 8.0]));
-        assert_eq!(a.dot(b), 1.0);
-        assert_eq!(a.norm(), 25.0);
+    fn to_analogue(self) -> Self::V { self.to_f32().unwrap() }
+}
+
+impl<const N: usize> Lattice<N> for Vector<i32, N> {
+    type V = Vector<f32, N>;
+
+    fn to_digital(_analogue: Self::V) -> (Self, f32) {
+        unimplemented!();
+    }
+
+    fn to_analogue(self) -> Self::V {
+        unimplemented!();
     }
 }
