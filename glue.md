@@ -2,7 +2,7 @@
 
 A [2023 paper] by Agrell, Pook-Kolb and Allen observes that glued lattices make better quantisation lattices than product lattices. Like everybody else, in my image compression algorithms I have until now been quantising images onto a product lattice. This document describes how I might instead use a glued lattice.
 
-[recent paper]: https://arxiv.org/pdf/2312.00481.pdf
+[2023 nopaper]: https://arxiv.org/pdf/2312.00481.pdf
 
 ## Background
 
@@ -57,7 +57,7 @@ The significance of G is that by adding one element of G to every point in BCC w
 
 ## A glued lattice
 
-Let's consider a tile of 4×4 pixels. Two generations of the Haar transform resolves if onto the following orthonormal basis vectors:
+Let's consider a tile of 4×4 pixels. Two generations of the Haar transform resolves it onto the following orthonormal basis vectors:
 
 ```
      ¼  ¼  ¼  ¼      ¼  ¼ -¼ -¼      ¼  ¼  ¼  ¼      ¼  ¼ -¼ -¼
