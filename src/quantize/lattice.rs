@@ -1,27 +1,41 @@
 use std::ops::{Add, Sub, Neg};
 use num_traits::{Zero, ToPrimitive};
-use num_traits::real::{Real};
-use vector_space::{VectorSpace, InnerSpace};
+use vector_space::{InnerSpace};
 use simple_vectors::{Vector};
+
+/// Map `f` over the elements of `v`.
+fn map_vector<T, U, const N: usize>(
+    v: Vector<T, N>,
+    mut f: impl FnMut(T) -> U,
+) -> Vector<U, N> {
+    let v: [T; N] = v.into();
+    let v: Vec<U> = Vec::from_iter(v.into_iter().map(|t| f(t)));
+    let v: [U; N] = v.try_into().unwrap_or_else(
+        |v: Vec<U>| panic!("Expected {} elements but got {}", N, v.len())
+    );
+    Vector::new(v)
+}
+
+// ----------------------------------------------------------------------------
 
 /// An integral lattice.
 ///
 /// This is an integral lattice; i.e. the dot product of any two lattice
 /// vectors must be an integer.
-pub trait Lattice<const N: usize>: Copy + Zero + PartialEq where
+pub trait Lattice: Copy + Zero + PartialEq where
     Self: Add<Output = Self>,
     Self: Sub<Output = Self>,
     Self: Neg<Output = Self>,
 {
     /// The analogue vector space that this `Lattice` approximates.
-    type V: InnerSpace;
+    type V: InnerSpace<Scalar=f32>;
 
     /// Rounds `analogue` to the nearest `Self`.
-    /// Also returns the [`norm`] of the quantisation error, which is
+    /// Adds to `error` the [`norm`] of the quantisation error, which is
     /// `analogue - Self::to_digital(analogue).to_analogue()`.
     ///
     /// [`norm`]: InnerSpace::magnitude2()
-    fn to_digital(analogue: Self::V) -> (Self, <Self::V as VectorSpace>::Scalar);
+    fn to_digital(analogue: Self::V, error: &mut f32) -> Self;
 
     /// Converts `self` to an analogue vector.
     fn to_analogue(self) -> Self::V;
@@ -39,26 +53,29 @@ pub trait Lattice<const N: usize>: Copy + Zero + PartialEq where
     fn magnitude2(self) -> u64 { self.clone().scalar(self) }
 }
 
-impl Lattice<1> for i32 {
+impl Lattice for i32 {
     type V = f32;
 
-    fn to_digital(analogue: Self::V) -> (Self, f32) {
+    fn to_digital(analogue: Self::V, error: &mut f32) -> Self {
         let ret = analogue.round().to_i32().expect("Overflow");
-        let error = analogue - ret.to_analogue();
-        (ret, error.magnitude2())
+        *error += (analogue - ret.to_analogue()).magnitude2();
+        ret
     }
 
     fn to_analogue(self) -> Self::V { self.to_f32().unwrap() }
 }
 
-impl<const N: usize> Lattice<N> for Vector<i32, N> {
-    type V = Vector<f32, N>;
+impl<D: Lattice<V=f32>, const N: usize> Lattice for Vector<D, N> {
+    type V = Vector<D::V, N>;
 
-    fn to_digital(_analogue: Self::V) -> (Self, f32) {
-        unimplemented!();
+    fn to_digital(analogue: Self::V, error: &mut f32) -> Self {
+        map_vector(analogue, |a| D::to_digital(a, error))
     }
 
     fn to_analogue(self) -> Self::V {
-        unimplemented!();
+        map_vector(self, D::to_analogue)
     }
 }
+
+// ----------------------------------------------------------------------------
+
