@@ -4,6 +4,7 @@ use super::{Quad, Tree, VHC};
 use super::transform::{Haar};
 
 mod lattice;
+pub use lattice::{Lattice, D};
 
 mod bcc;
 pub use bcc::{ShiftedBCC, Symmetry, ALL_SYMMETRIES, Residual, ALL_RESIDUALS, Chain};
